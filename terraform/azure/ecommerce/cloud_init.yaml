@@ -1,0 +1,51 @@
+#cloud-config
+package_update: true
+packages:
+  - git
+  - nginx
+  - curl
+
+runcmd:
+  - curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+  - apt-get install -y nodejs
+  - git clone ${repo_url} /tmp/sallys-app
+  - mkdir -p /var/www/ecommerce
+  - cp /tmp/sallys-app/apps/ecommerce/index.html /var/www/ecommerce/
+  - cp /tmp/sallys-app/apps/ecommerce/style.css /var/www/ecommerce/
+  - cp /tmp/sallys-app/apps/ecommerce/app.js /var/www/ecommerce/
+  - mkdir -p /opt/sallys-shop
+  - cp -r /tmp/sallys-app/apps/ecommerce/server/. /opt/sallys-shop/
+  - cd /opt/sallys-shop && npm install --omit=dev
+  - |
+    cat > /opt/sallys-shop/.env <<EOF
+    DB_HOST=${db_host}
+    DB_PORT=3306
+    DB_USER=${db_user}
+    DB_PASSWORD=${db_password}
+    DB_NAME=${db_name}
+    PORT=3000
+    EOF
+  - |
+    cat > /etc/nginx/sites-available/sallys-shop <<'EOF'
+    server {
+        listen 80 default_server;
+        root /var/www/ecommerce;
+        index index.html;
+        location /api/ {
+            proxy_pass http://127.0.0.1:3000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+        location / {
+            try_files $uri $uri/ /index.html;
+        }
+    }
+    EOF
+  - ln -sf /etc/nginx/sites-available/sallys-shop /etc/nginx/sites-enabled/sallys-shop
+  - rm -f /etc/nginx/sites-enabled/default
+  - npm install -g pm2
+  - cd /opt/sallys-shop && pm2 start index.js --name sallys-shop
+  - pm2 startup systemd -u root --hp /root
+  - pm2 save
+  - systemctl enable nginx
+  - systemctl restart nginx
