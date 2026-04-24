@@ -15,8 +15,29 @@ terraform {
   }
 }
 
+# Untagged provider exists only to create the AppRegistry application itself,
+# which would otherwise form a cycle with default_tags below.
+provider "aws" {
+  alias  = "bootstrap"
+  region = var.aws_region
+}
+
 provider "aws" {
   region = var.aws_region
+
+  default_tags {
+    tags = aws_servicecatalogappregistry_application.blog.application_tag
+  }
+}
+
+# ── myApplications ────────────────────────────────────────────────────────────
+# Groups every resource in this stack under a single Application entry in the
+# AWS console. The application_tag is applied to all resources via default_tags.
+
+resource "aws_servicecatalogappregistry_application" "blog" {
+  provider    = aws.bootstrap
+  name        = "sallys-blog"
+  description = "Sally's static blog — S3 + CloudFront + Route 53 + ACM"
 }
 
 resource "random_id" "suffix" {
