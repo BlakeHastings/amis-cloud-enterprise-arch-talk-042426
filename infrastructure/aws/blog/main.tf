@@ -22,7 +22,50 @@ resource "random_id" "suffix" {
 locals {
   bucket_name = "sallys-blog-${random_id.suffix.hex}"
   app_dir     = "${path.module}/../../../demos/blog"
+  domain      = "sallyscloud.com"
+  subdomain   = "blog.sallyscloud.com"
 }
+
+# ── Route 53 ─────────────────────────────────────────────────────────────────
+
+data "aws_route53_zone" "main" {
+  name = local.domain
+}
+
+# ── ACM Certificate ───────────────────────────────────────────────────────────
+
+resource "aws_acm_certificate" "blog" {
+  domain_name       = local.subdomain
+  validation_method = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_route53_record" "cert_validation" {
+  for_each = {
+    for dvo in aws_acm_certificate.blog.domain_validation_options : dvo.domain_name => {
+      name   = dvo.resource_record_name
+      record = dvo.resource_record_value
+      type   = dvo.resource_record_type
+    }
+  }
+
+  allow_overwrite = true
+  name            = each.value.name
+  records         = [each.value.record]
+  ttl             = 60
+  type            = each.value.type
+  zone_id         = data.aws_route53_zone.main.zone_id
+}
+
+resource "aws_acm_certificate_validation" "blog" {
+  certificate_arn         = aws_acm_certificate.blog.arn
+  validation_record_fqdns = [for r in aws_route53_record.cert_validation : r.fqdn]
+}
+
+# ── S3 ────────────────────────────────────────────────────────────────────────
 
 resource "aws_s3_bucket" "blog" {
   bucket = local.bucket_name
@@ -35,6 +78,8 @@ resource "aws_s3_bucket_public_access_block" "blog" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+
+# ── CloudFront ────────────────────────────────────────────────────────────────
 
 resource "aws_cloudfront_origin_access_control" "blog" {
   name                              = "sallys-blog-oac-${random_id.suffix.hex}"
@@ -53,6 +98,7 @@ resource "aws_cloudfront_distribution" "blog" {
   enabled             = true
   default_root_object = "index.html"
   price_class         = "PriceClass_100"
+  aliases             = [local.subdomain]
 
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD"]
@@ -81,7 +127,9 @@ resource "aws_cloudfront_distribution" "blog" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn      = aws_acm_certificate_validation.blog.certificate_arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
   }
 }
 
@@ -90,8 +138,8 @@ resource "aws_s3_bucket_policy" "blog" {
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [{
-      Sid    = "AllowCloudFront"
-      Effect = "Allow"
+      Sid       = "AllowCloudFront"
+      Effect    = "Allow"
       Principal = { Service = "cloudfront.amazonaws.com" }
       Action    = "s3:GetObject"
       Resource  = "${aws_s3_bucket.blog.arn}/*"
@@ -101,6 +149,22 @@ resource "aws_s3_bucket_policy" "blog" {
     }]
   })
 }
+
+# ── Route 53 alias → CloudFront ───────────────────────────────────────────────
+
+resource "aws_route53_record" "blog" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = local.subdomain
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.blog.domain_name
+    zone_id                = aws_cloudfront_distribution.blog.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+# ── S3 objects ────────────────────────────────────────────────────────────────
 
 resource "aws_s3_object" "index" {
   bucket       = aws_s3_bucket.blog.id

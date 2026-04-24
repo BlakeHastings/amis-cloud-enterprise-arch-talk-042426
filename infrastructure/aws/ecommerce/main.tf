@@ -20,10 +20,26 @@ resource "random_id" "suffix" {
 }
 
 locals {
-  name    = "sallys-shop-${random_id.suffix.hex}"
-  db_name = "sallys_shop"
-  db_user = "shopuser"
-  repo    = "https://github.com/BlakeHastings/amis-cloud-enterprise-arch-talk-042426.git"
+  name      = "sallys-shop-${random_id.suffix.hex}"
+  db_name   = "sallys_shop"
+  db_user   = "shopuser"
+  repo      = "https://github.com/BlakeHastings/amis-cloud-enterprise-arch-talk-042426.git"
+  domain    = "sallyscloud.com"
+  subdomain = "shop.sallyscloud.com"
+}
+
+# ── Route 53 ─────────────────────────────────────────────────────────────────
+
+data "aws_route53_zone" "main" {
+  name = local.domain
+}
+
+resource "aws_route53_record" "shop" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = local.subdomain
+  type    = "A"
+  ttl     = 300
+  records = [aws_eip.web.public_ip]
 }
 
 # ── VPC ──────────────────────────────────────────────────────────────────────
@@ -108,24 +124,24 @@ resource "aws_db_subnet_group" "main" {
 }
 
 resource "aws_db_instance" "mysql" {
-  identifier           = local.name
-  engine               = "mysql"
-  engine_version       = "8.0"
-  instance_class       = "db.t3.micro"
-  allocated_storage    = 20
-  db_name              = local.db_name
-  username             = local.db_user
-  password             = var.db_password
-  db_subnet_group_name = aws_db_subnet_group.main.name
+  identifier             = local.name
+  engine                 = "mysql"
+  engine_version         = "8.0"
+  instance_class         = "db.t3.micro"
+  allocated_storage      = 20
+  db_name                = local.db_name
+  username               = local.db_user
+  password               = var.db_password
+  db_subnet_group_name   = aws_db_subnet_group.main.name
   vpc_security_group_ids = [aws_security_group.db.id]
-  skip_final_snapshot  = true
-  deletion_protection  = false
-  publicly_accessible  = false
+  skip_final_snapshot    = true
+  deletion_protection    = false
+  publicly_accessible    = false
 
   tags = { Name = local.name }
 }
 
-# ── EC2 ───────────────────────────────────────────────────────────────────────
+# ── EC2 + Elastic IP ──────────────────────────────────────────────────────────
 
 data "aws_ami" "amazon_linux" {
   most_recent = true
@@ -154,4 +170,10 @@ resource "aws_instance" "web" {
   depends_on = [aws_db_instance.mysql]
 
   tags = { Name = local.name }
+}
+
+resource "aws_eip" "web" {
+  instance = aws_instance.web.id
+  domain   = "vpc"
+  tags     = { Name = local.name }
 }

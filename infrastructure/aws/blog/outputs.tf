@@ -1,8 +1,9 @@
 output "blog_url" {
-  description = "Sally's Blog URL"
-  value       = "https://${aws_cloudfront_distribution.blog.domain_name}"
+  description = "Sally's Blog — AWS"
+  value       = "https://blog.sallyscloud.com"
 }
 
-output "s3_bucket" {
-  value = aws_s3_bucket.blog.id
+output "cloudfront_domain" {
+  description = "Raw CloudFront domain (usable before DNS propagates)"
+  value       = "https://${aws_cloudfront_distribution.blog.domain_name}"
 }

@@ -4,6 +4,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.0"
     }
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
     random = {
       source  = "hashicorp/random"
       version = "~> 3.0"
@@ -15,6 +19,10 @@ provider "azurerm" {
   features {}
 }
 
+provider "aws" {
+  region = "us-east-1"
+}
+
 resource "random_string" "suffix" {
   length  = 6
   special = false
@@ -22,9 +30,25 @@ resource "random_string" "suffix" {
 }
 
 locals {
-  name    = "sallys-shop-${random_string.suffix.result}"
-  db_name = "sallys_shop"
-  repo    = "https://github.com/BlakeHastings/amis-cloud-enterprise-arch-talk-042426.git"
+  name      = "sallys-shop-${random_string.suffix.result}"
+  db_name   = "sallys_shop"
+  repo      = "https://github.com/BlakeHastings/amis-cloud-enterprise-arch-talk-042426.git"
+  domain    = "sallyscloud.com"
+  subdomain = "azure-shop.sallyscloud.com"
+}
+
+# ── Route 53 ─────────────────────────────────────────────────────────────────
+
+data "aws_route53_zone" "main" {
+  name = local.domain
+}
+
+resource "aws_route53_record" "azure_shop" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = local.subdomain
+  type    = "A"
+  ttl     = 300
+  records = [azurerm_public_ip.web.ip_address]
 }
 
 # ── Resource Group ────────────────────────────────────────────────────────────
@@ -146,8 +170,8 @@ resource "azurerm_mysql_flexible_server" "main" {
   sku_name               = "B_Standard_B1ms"
   version                = "8.0.21"
 
-  delegated_subnet_id    = azurerm_subnet.db.id
-  private_dns_zone_id    = azurerm_private_dns_zone.mysql.id
+  delegated_subnet_id = azurerm_subnet.db.id
+  private_dns_zone_id = azurerm_private_dns_zone.mysql.id
 
   backup_retention_days = 1
 

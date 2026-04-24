@@ -1,8 +1,9 @@
 output "blog_url" {
-  description = "Sally's Blog URL (Azure Static Website)"
-  value       = azurerm_storage_account.blog.primary_web_endpoint
+  description = "Sally's Blog — Azure"
+  value       = "https://azure-blog.sallyscloud.com"
 }
 
-output "storage_account_name" {
-  value = azurerm_storage_account.blog.name
+output "cdn_endpoint" {
+  description = "Raw CDN endpoint (usable before DNS propagates)"
+  value       = "https://${azurerm_cdn_endpoint.blog.name}.azureedge.net"
 }

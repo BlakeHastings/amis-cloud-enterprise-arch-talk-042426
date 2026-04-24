@@ -1,10 +1,11 @@
 output "shop_url" {
-  description = "Sally's Tech Shop URL"
-  value       = "http://${azurerm_public_ip.web.ip_address}"
+  description = "Sally's Tech Shop — Azure"
+  value       = "http://azure-shop.sallyscloud.com"
 }
 
 output "vm_public_ip" {
-  value = azurerm_public_ip.web.ip_address
+  description = "VM public IP (usable before DNS propagates)"
+  value       = azurerm_public_ip.web.ip_address
 }
 
 output "mysql_host" {
