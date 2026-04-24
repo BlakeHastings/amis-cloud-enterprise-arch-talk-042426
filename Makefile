@@ -34,6 +34,7 @@ help:
 
 aws-blog-up:
 	cd $(TF_AWS_BLOG) && terraform init -input=false && \
+	  terraform apply -target=aws_servicecatalogappregistry_application.blog -auto-approve && \
 	  terraform apply -auto-approve && \
 	  echo "" && echo "✅  Blog URL: $$(terraform output -raw blog_url)"
 
@@ -45,6 +46,7 @@ aws-blog-down:
 aws-shop-up:
 	@test -n "$(TF_VAR_db_password)" || (echo "❌  Set TF_VAR_db_password first" && exit 1)
 	cd $(TF_AWS_SHOP) && terraform init -input=false && \
+	  terraform apply -target=aws_servicecatalogappregistry_application.shop -auto-approve && \
 	  terraform apply -auto-approve && \
 	  echo "" && echo "✅  Shop URL: $$(terraform output -raw shop_url)" && \
 	  echo "    (allow ~3 min for EC2 user_data to finish bootstrapping)"
