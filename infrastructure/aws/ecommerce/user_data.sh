@@ -17,14 +17,14 @@ git clone ${repo_url} /tmp/sallys-app
 
 # Static frontend → nginx root
 mkdir -p /var/www/ecommerce
-cp -r /tmp/sallys-app/apps/ecommerce/index.html \
-       /tmp/sallys-app/apps/ecommerce/style.css \
-       /tmp/sallys-app/apps/ecommerce/app.js \
+cp -r /tmp/sallys-app/demos/ecommerce/index.html \
+       /tmp/sallys-app/demos/ecommerce/style.css \
+       /tmp/sallys-app/demos/ecommerce/app.js \
        /var/www/ecommerce/
 
 # Node backend
 mkdir -p /opt/sallys-shop
-cp -r /tmp/sallys-app/apps/ecommerce/server/* /opt/sallys-shop/
+cp -r /tmp/sallys-app/demos/ecommerce/server/* /opt/sallys-shop/
 cd /opt/sallys-shop && npm install --omit=dev
 
 # Environment

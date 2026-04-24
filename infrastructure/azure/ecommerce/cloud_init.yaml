@@ -10,11 +10,11 @@ runcmd:
   - apt-get install -y nodejs
   - git clone ${repo_url} /tmp/sallys-app
   - mkdir -p /var/www/ecommerce
-  - cp /tmp/sallys-app/apps/ecommerce/index.html /var/www/ecommerce/
-  - cp /tmp/sallys-app/apps/ecommerce/style.css /var/www/ecommerce/
-  - cp /tmp/sallys-app/apps/ecommerce/app.js /var/www/ecommerce/
+  - cp /tmp/sallys-app/demos/ecommerce/index.html /var/www/ecommerce/
+  - cp /tmp/sallys-app/demos/ecommerce/style.css /var/www/ecommerce/
+  - cp /tmp/sallys-app/demos/ecommerce/app.js /var/www/ecommerce/
   - mkdir -p /opt/sallys-shop
-  - cp -r /tmp/sallys-app/apps/ecommerce/server/. /opt/sallys-shop/
+  - cp -r /tmp/sallys-app/demos/ecommerce/server/. /opt/sallys-shop/
   - cd /opt/sallys-shop && npm install --omit=dev
   - |
     cat > /opt/sallys-shop/.env <<EOF

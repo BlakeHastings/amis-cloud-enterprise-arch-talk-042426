@@ -44,7 +44,6 @@ aws-blog-down:
 # ── AWS Ecommerce ─────────────────────────────────────────────────────────────
 
 aws-shop-up:
-	@test -n "$(TF_VAR_db_password)" || (echo "❌  Set TF_VAR_db_password first" && exit 1)
 	cd $(TF_AWS_SHOP) && terraform init -input=false && \
 	  terraform apply -target=aws_servicecatalogappregistry_application.shop -auto-approve && \
 	  terraform apply -auto-approve && \
@@ -67,7 +66,6 @@ azure-blog-down:
 # ── Azure Ecommerce ───────────────────────────────────────────────────────────
 
 azure-shop-up:
-	@test -n "$(TF_VAR_admin_password)" || (echo "❌  Set TF_VAR_admin_password first" && exit 1)
 	cd $(TF_AZURE_SHOP) && terraform init -input=false && \
 	  terraform apply -auto-approve && \
 	  echo "" && echo "✅  Shop URL: $$(terraform output -raw shop_url)" && \
