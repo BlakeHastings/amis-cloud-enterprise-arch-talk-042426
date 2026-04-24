@@ -204,7 +204,7 @@ resource "null_resource" "purge_azure_cdn" {
   }
 
   provisioner "local-exec" {
-    command = "az afd endpoint purge --resource-group ${azurerm_resource_group.blog.name} --profile-name ${azurerm_cdn_frontdoor_profile.blog.name} --endpoint-name ${azurerm_cdn_frontdoor_endpoint.blog.name} --content-paths /index.html /style.css /app.js"
+    command = "az afd endpoint purge --no-wait --resource-group ${azurerm_resource_group.blog.name} --profile-name ${azurerm_cdn_frontdoor_profile.blog.name} --endpoint-name ${azurerm_cdn_frontdoor_endpoint.blog.name} --content-paths /index.html /style.css /app.js"
   }
 
   depends_on = [azurerm_cdn_frontdoor_route.blog]
