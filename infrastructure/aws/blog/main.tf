@@ -205,6 +205,6 @@ resource "null_resource" "invalidate_cloudfront" {
   }
 
   provisioner "local-exec" {
-    command = "aws cloudfront create-invalidation --distribution-id ${aws_cloudfront_distribution.blog.id} --paths \"/*\""
+    command = "aws cloudfront create-invalidation --distribution-id ${aws_cloudfront_distribution.blog.id} --paths /index.html /style.css /app.js"
   }
 }
