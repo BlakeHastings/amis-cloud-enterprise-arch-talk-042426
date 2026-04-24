@@ -95,62 +95,105 @@ resource "azurerm_storage_blob" "app_js" {
   content_md5            = filemd5("${local.app_dir}/app.js")
 }
 
-# ── Azure CDN ─────────────────────────────────────────────────────────────────
+# ── Azure Front Door Standard ────────────────────────────────────────────────
+# Classic Azure CDN (Microsoft) no longer accepts new profile creation as of
+# Sept 2024. Front Door Standard is the modern successor.
 
-resource "azurerm_cdn_profile" "blog" {
-  name                = "sallys-blog-cdn-${random_string.suffix.result}"
-  location            = "global"
+resource "azurerm_cdn_frontdoor_profile" "blog" {
+  name                = "sallys-blog-fd-${random_string.suffix.result}"
   resource_group_name = azurerm_resource_group.blog.name
-  sku                 = "Standard_Microsoft"
+  sku_name            = "Standard_AzureFrontDoor"
 }
 
-resource "azurerm_cdn_endpoint" "blog" {
-  name                = "azure-blog-${random_string.suffix.result}"
-  profile_name        = azurerm_cdn_profile.blog.name
-  location            = "global"
-  resource_group_name = azurerm_resource_group.blog.name
+resource "azurerm_cdn_frontdoor_endpoint" "blog" {
+  name                     = "azure-blog-${random_string.suffix.result}"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.blog.id
+}
 
-  origin_host_header = azurerm_storage_account.blog.primary_web_host
+resource "azurerm_cdn_frontdoor_origin_group" "blog" {
+  name                     = "storage-origin-group"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.blog.id
+  session_affinity_enabled = false
 
-  origin {
-    name      = "storage"
-    host_name = azurerm_storage_account.blog.primary_web_host
+  load_balancing {
+    sample_size                        = 4
+    successful_samples_required        = 3
+    additional_latency_in_milliseconds = 50
+  }
+
+  health_probe {
+    path                = "/"
+    protocol            = "Https"
+    interval_in_seconds = 120
+    request_type        = "HEAD"
   }
 }
 
-# ── Route 53 CNAME → CDN endpoint ────────────────────────────────────────────
-# Must exist before Azure can validate the custom domain
+resource "azurerm_cdn_frontdoor_origin" "blog" {
+  name                          = "storage-origin"
+  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.blog.id
+
+  enabled                        = true
+  host_name                      = azurerm_storage_account.blog.primary_web_host
+  origin_host_header             = azurerm_storage_account.blog.primary_web_host
+  http_port                      = 80
+  https_port                     = 443
+  priority                       = 1
+  weight                         = 1000
+  certificate_name_check_enabled = true
+}
+
+# ── Custom domain + DNS validation ───────────────────────────────────────────
+# Front Door validates ownership via a TXT record at _dnsauth.{subdomain}
+
+resource "azurerm_cdn_frontdoor_custom_domain" "blog" {
+  name                     = "azure-blog-${random_string.suffix.result}"
+  cdn_frontdoor_profile_id = azurerm_cdn_frontdoor_profile.blog.id
+  host_name                = local.subdomain
+
+  tls {
+    certificate_type    = "ManagedCertificate"
+    minimum_tls_version = "TLS12"
+  }
+}
+
+resource "aws_route53_record" "azure_blog_validation" {
+  zone_id = data.aws_route53_zone.main.zone_id
+  name    = "_dnsauth.${local.subdomain}"
+  type    = "TXT"
+  ttl     = 300
+  records = [azurerm_cdn_frontdoor_custom_domain.blog.validation_token]
+}
 
 resource "aws_route53_record" "azure_blog" {
   zone_id = data.aws_route53_zone.main.zone_id
   name    = local.subdomain
   type    = "CNAME"
   ttl     = 300
-  records = ["${azurerm_cdn_endpoint.blog.name}.azureedge.net"]
+  records = [azurerm_cdn_frontdoor_endpoint.blog.host_name]
 }
 
-# ── CDN custom domain + managed HTTPS ────────────────────────────────────────
+# ── Route ────────────────────────────────────────────────────────────────────
 
-resource "azurerm_cdn_endpoint_custom_domain" "blog" {
-  name            = "azure-blog"
-  cdn_endpoint_id = azurerm_cdn_endpoint.blog.id
-  host_name       = local.subdomain
+resource "azurerm_cdn_frontdoor_route" "blog" {
+  name                          = "default-route"
+  cdn_frontdoor_endpoint_id     = azurerm_cdn_frontdoor_endpoint.blog.id
+  cdn_frontdoor_origin_group_id = azurerm_cdn_frontdoor_origin_group.blog.id
+  cdn_frontdoor_origin_ids      = [azurerm_cdn_frontdoor_origin.blog.id]
+  enabled                       = true
 
-  cdn_managed_https {
-    certificate_type = "Dedicated"
-    protocol_type    = "ServerNameIndication"
-    tls_version      = "TLS12"
-  }
+  forwarding_protocol    = "HttpsOnly"
+  https_redirect_enabled = true
+  patterns_to_match      = ["/*"]
+  supported_protocols    = ["Http", "Https"]
 
-  depends_on = [aws_route53_record.azure_blog]
+  cdn_frontdoor_custom_domain_ids = [azurerm_cdn_frontdoor_custom_domain.blog.id]
+  link_to_default_domain          = true
 
-  timeouts {
-    create = "60m"
-    update = "60m"
-  }
+  depends_on = [aws_route53_record.azure_blog_validation]
 }
 
-# ── Azure CDN purge ──────────────────────────────────────────────────────────
+# ── Front Door cache purge ───────────────────────────────────────────────────
 # Fires only when a blog file actually changes
 
 resource "null_resource" "purge_azure_cdn" {
@@ -161,8 +204,8 @@ resource "null_resource" "purge_azure_cdn" {
   }
 
   provisioner "local-exec" {
-    command = "az cdn endpoint purge --resource-group ${azurerm_resource_group.blog.name} --profile-name ${azurerm_cdn_profile.blog.name} --name ${azurerm_cdn_endpoint.blog.name} --content-paths \"/*\""
+    command = "az afd endpoint purge --resource-group ${azurerm_resource_group.blog.name} --profile-name ${azurerm_cdn_frontdoor_profile.blog.name} --endpoint-name ${azurerm_cdn_frontdoor_endpoint.blog.name} --content-paths /index.html /style.css /app.js"
   }
 
-  depends_on = [azurerm_cdn_endpoint.blog]
+  depends_on = [azurerm_cdn_frontdoor_route.blog]
 }

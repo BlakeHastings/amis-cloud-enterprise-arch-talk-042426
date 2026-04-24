@@ -4,6 +4,6 @@ output "blog_url" {
 }
 
 output "cdn_endpoint" {
-  description = "Raw CDN endpoint (usable before DNS propagates)"
-  value       = "https://${azurerm_cdn_endpoint.blog.name}.azureedge.net"
+  description = "Raw Front Door endpoint (usable before DNS propagates)"
+  value       = "https://${azurerm_cdn_frontdoor_endpoint.blog.host_name}"
 }
