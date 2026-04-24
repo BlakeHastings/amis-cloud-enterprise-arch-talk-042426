@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.0"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -188,4 +192,19 @@ resource "aws_s3_object" "app_js" {
   source       = "${local.app_dir}/app.js"
   content_type = "application/javascript"
   etag         = filemd5("${local.app_dir}/app.js")
+}
+
+# ── CloudFront invalidation ──────────────────────────────────────────────────
+# Fires only when a blog file actually changes
+
+resource "null_resource" "invalidate_cloudfront" {
+  triggers = {
+    index  = aws_s3_object.index.etag
+    style  = aws_s3_object.style.etag
+    app_js = aws_s3_object.app_js.etag
+  }
+
+  provisioner "local-exec" {
+    command = "aws cloudfront create-invalidation --distribution-id ${aws_cloudfront_distribution.blog.id} --paths \"/*\""
+  }
 }

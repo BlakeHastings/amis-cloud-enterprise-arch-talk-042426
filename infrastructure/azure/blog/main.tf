@@ -12,6 +12,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.0"
     }
+    null = {
+      source  = "hashicorp/null"
+      version = "~> 3.0"
+    }
   }
 }
 
@@ -144,4 +148,21 @@ resource "azurerm_cdn_endpoint_custom_domain" "blog" {
     create = "60m"
     update = "60m"
   }
+}
+
+# ── Azure CDN purge ──────────────────────────────────────────────────────────
+# Fires only when a blog file actually changes
+
+resource "null_resource" "purge_azure_cdn" {
+  triggers = {
+    index  = azurerm_storage_blob.index.content_md5
+    style  = azurerm_storage_blob.style.content_md5
+    app_js = azurerm_storage_blob.app_js.content_md5
+  }
+
+  provisioner "local-exec" {
+    command = "az cdn endpoint purge --resource-group ${azurerm_resource_group.blog.name} --profile-name ${azurerm_cdn_profile.blog.name} --name ${azurerm_cdn_endpoint.blog.name} --content-paths \"/*\""
+  }
+
+  depends_on = [azurerm_cdn_endpoint.blog]
 }
