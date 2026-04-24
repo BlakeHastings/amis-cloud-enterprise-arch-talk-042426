@@ -5,10 +5,10 @@
         azure-shop-up azure-shop-down \
         all-up all-down
 
-TF_AWS_BLOG     := terraform/aws/blog
-TF_AWS_SHOP     := terraform/aws/ecommerce
-TF_AZURE_BLOG   := terraform/azure/blog
-TF_AZURE_SHOP   := terraform/azure/ecommerce
+TF_AWS_BLOG     := infrastructure/aws/blog
+TF_AWS_SHOP     := infrastructure/aws/ecommerce
+TF_AZURE_BLOG   := infrastructure/azure/blog
+TF_AZURE_SHOP   := infrastructure/azure/ecommerce
 
 help:
 	@echo ""

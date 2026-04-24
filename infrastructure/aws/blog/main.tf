@@ -21,7 +21,7 @@ resource "random_id" "suffix" {
 
 locals {
   bucket_name = "sallys-blog-${random_id.suffix.hex}"
-  app_dir     = "${path.module}/../../../apps/blog"
+  app_dir     = "${path.module}/../../../demos/blog"
 }
 
 resource "aws_s3_bucket" "blog" {

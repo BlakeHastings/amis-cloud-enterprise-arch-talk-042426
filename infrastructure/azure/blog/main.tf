@@ -22,7 +22,7 @@ resource "random_string" "suffix" {
 }
 
 locals {
-  app_dir = "${path.module}/../../../apps/blog"
+  app_dir = "${path.module}/../../../demos/blog"
 }
 
 resource "azurerm_resource_group" "blog" {
